@@ -19,7 +19,7 @@
  * Difficulty: 1
  */
 int bitAnd(int x, int y) {
-    return 2;
+    return ~(~x | ~y);
 }
 
 /*
@@ -30,7 +30,7 @@ int bitAnd(int x, int y) {
  *   Difficulty: 1
  */
 int bitXor(int x, int y) {
-    return 2;
+    return ~(~(x & ~y) & ~(~x & y));
 }
 
 /*
@@ -49,8 +49,12 @@ int bitXor(int x, int y) {
  * Returns:
  *   1 if x and y have the same sign , 0 otherwise.
  */
-int samesign(int x, int y) {
-    return 2;
+int samesign(int x, int y)
+{
+    int sx = x >> 31;
+    int sy = y >> 31;
+
+    return !(sx ^ sy) & (!((!x) ^ (!y)));
 }
 
 /*
@@ -62,8 +66,25 @@ int samesign(int x, int y) {
  *   Max ops: 25
  *   Difficulty: 4
  */
-int logtwo(int v) {
-    return 2;
+int logtwo(int v)
+{
+    int r = 0;
+
+    r = r + ((!!(v >> 16)) << 4);
+    v = v >> r;
+
+    r = r + ((!!(v >> 8)) << 3);
+    v = v >> ((!!(v >> 8)) << 3);
+
+    r = r + ((!!(v >> 4)) << 2);
+    v = v >> ((!!(v >> 4)) << 2);
+
+    r = r + ((!!(v >> 2)) << 1);
+    v = v >> ((!!(v >> 2)) << 1);
+
+    r = r + (!!(v >> 1));
+
+    return r;
 }
 
 /*
@@ -75,8 +96,20 @@ int logtwo(int v) {
  *    Max ops: 17
  *    Difficulty: 2
  */
-int byteSwap(int x, int n, int m) {
-    return 2;
+int byteSwap(int x, int n, int m)
+{
+    int bn = (x >> (n << 3)) & 0xff;
+    int bm = (x >> (m << 3)) & 0xff;
+
+    int mask = (0xff << (n << 3)) |
+               (0xff << (m << 3));
+
+    x = x & ~mask;
+
+    x = x | (bn << (m << 3))
+          | (bm << (n << 3));
+
+    return x;
 }
 
 /*
@@ -87,8 +120,29 @@ int byteSwap(int x, int n, int m) {
  *   Max ops: 30
  *   Difficulty: 3
  */
-unsigned reverse(unsigned v) {
-    return 2;
+unsigned reverse(unsigned v)
+{
+    unsigned mask1 = 0x55555555;
+    unsigned mask2 = 0x33333333;
+    unsigned mask3 = 0x0f0f0f0f;
+    unsigned mask4 = 0x00ff00ff;
+
+    // 交换相邻1bit
+    v = ((v >> 1) & mask1) | ((v & mask1) << 1);
+
+    // 交换相邻2bit
+    v = ((v >> 2) & mask2) | ((v & mask2) << 2);
+
+    // 交换相邻4bit
+    v = ((v >> 4) & mask3) | ((v & mask3) << 4);
+
+    // 交换相邻8bit
+    v = ((v >> 8) & mask4) | ((v & mask4) << 8);
+
+    // 交换16bit
+    v = (v >> 16) | (v << 16);
+
+    return v;
 }
 
 /*
@@ -99,8 +153,11 @@ unsigned reverse(unsigned v) {
  *   Max ops: 20
  *   Difficulty: 3
  */
-int logicalShift(int x, int n) {
-    return 2;
+int logicalShift(int x, int n)
+{
+    int mask = ~(((1 << 31) >> n) << 1);
+
+    return (x >> n) & mask;
 }
 
 /*
@@ -111,8 +168,33 @@ int logicalShift(int x, int n) {
  *   Max ops: 50
  *   Difficulty: 4
  */
-int leftBitCount(int x) {
-    return 2;
+int leftBitCount(int x)
+{
+    int n = 0;
+
+    // 统计 ~x 的前导0数量
+    x = ~x;
+
+    int b16 = !(x >> 16);
+    n += b16 << 4;
+    x <<= b16 << 4;
+
+    int b8 = !(x >> 24);
+    n += b8 << 3;
+    x <<= b8 << 3;
+
+    int b4 = !(x >> 28);
+    n += b4 << 2;
+    x <<= b4 << 2;
+
+    int b2 = !(x >> 30);
+    n += b2 << 1;
+    x <<= b2 << 1;
+
+    n += !(x >> 31);
+
+    // 处理 x 原来全1的情况
+    return n + !x;
 }
 
 /*
@@ -123,8 +205,71 @@ int leftBitCount(int x) {
  *   Max ops: 30
  *   Difficulty: 4
  */
-unsigned float_i2f(int x) {
-    return 2;
+unsigned float_i2f(int x)
+{
+    unsigned sign = 0;
+
+    if (x == 0)
+        return 0;
+
+    if (x == 0x80000000)
+        return 0xcf000000;
+
+
+    if (x < 0)
+    {
+        sign = 0x80000000;
+        x = -x;
+    }
+
+
+    int pos = 31;
+
+    while (!(x & (1 << pos)))
+        pos--;
+
+
+    int exp = pos + 127;
+
+
+    unsigned frac;
+
+
+    if (pos <= 23)
+    {
+        frac = x << (23 - pos);
+    }
+    else
+    {
+        int shift = pos - 23;
+
+        frac = x >> shift;
+
+
+        unsigned rest = x & ((1 << shift) - 1);
+
+        unsigned half = 1 << (shift - 1);
+
+
+        if (rest > half || 
+           (rest == half && (frac & 1)))
+        {
+            frac++;
+        }
+
+
+        if (frac == (1 << 24))
+        {
+            exp++;
+            frac >>= 1;
+        }
+    }
+
+
+    frac &= 0x7fffff;
+
+
+    return sign | (exp << 23) | frac;
 }
 
 /*
@@ -138,8 +283,44 @@ unsigned float_i2f(int x) {
  *   Max ops: 30
  *   Difficulty: 4
  */
-unsigned floatScale2(unsigned uf) {
-    return 2;
+unsigned floatScale2(unsigned uf)
+{
+    unsigned sign = uf & 0x80000000;
+    unsigned exp = uf & 0x7F800000;
+    unsigned frac = uf & 0x007FFFFF;
+
+
+    // NaN or infinity
+    if (exp == 0x7F800000)
+        return uf;
+
+
+    // denormalized
+    if (exp == 0)
+    {
+        frac <<= 1;
+
+        // becomes normalized
+        if (frac & 0x00800000)
+        {
+            exp = 0x00800000;
+            frac &= 0x007FFFFF;
+        }
+
+        return sign | exp | frac;
+    }
+
+
+    // normal number
+    exp += 0x00800000;
+
+
+    // overflow
+    if (exp == 0x7F800000)
+        frac = 0;
+
+
+    return sign | exp | frac;
 }
 
 /*
@@ -156,7 +337,56 @@ unsigned floatScale2(unsigned uf) {
  *   Difficulty: 3
  */
 int float64_f2i(unsigned uf1, unsigned uf2) {
-    return 2;
+
+    // uf2 是高32位
+    unsigned high = uf2;
+    unsigned low = uf1;
+
+
+    int sign = high >> 31;
+
+    int exp = (high >> 20) & 0x7FF;
+
+
+    unsigned frac_high = high & 0xFFFFF;
+
+
+    if (exp == 0x7FF)
+        return 0x80000000;
+
+
+    int E = exp - 1023;
+
+
+    if (E < 0)
+        return 0;
+
+
+    if (E > 31)
+        return 0x80000000;
+
+
+    unsigned long long frac =
+        ((unsigned long long)frac_high << 32) | low;
+
+
+    // 加隐藏位
+    frac |= (1ULL << 52);
+
+
+    unsigned long long result;
+
+
+    if(E >= 52)
+    result = frac << (E - 52);
+    else
+    result = frac >> (52 - E);
+
+
+    if (sign)
+        return -result;
+
+    return result;
 }
 
 /*
@@ -172,6 +402,23 @@ int float64_f2i(unsigned uf1, unsigned uf2) {
  *   Max ops: 30
  *   Difficulty: 4
  */
-unsigned floatPower2(int x) {
-    return 2;
+unsigned floatPower2(int x)
+{
+    // too small: 2^x < 2^-149
+    if (x < -149)
+        return 0;
+
+
+    // too large: overflow to +infinity
+    if (x > 127)
+        return 0x7F800000;
+
+
+    // denormalized numbers
+    if (x < -126)
+        return 1 << (x + 149);
+
+
+    // normalized numbers
+    return (x + 127) << 23;
 }
